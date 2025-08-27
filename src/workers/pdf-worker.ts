@@ -59,6 +59,8 @@ async function handleParse(fileName: string, fileBuffer: ArrayBuffer) {
     const result = await selected.parse(bytes, (p, m) =>
       emitProgress(Math.min(10 + Math.floor(p * 0.9), 99), m)
     );
+
+    console.log("result", result);
     emitProgress(100, "Done");
     postMessageFromWorker({ kind: "complete", result });
   } catch (error) {
