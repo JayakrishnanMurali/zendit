@@ -104,7 +104,7 @@ export default function UploadPage() {
               {error ? (
                 <div className="text-sm text-red-600">{error}</div>
               ) : (
-                <pre className="max-h-64 overflow-auto rounded bg-muted p-2 text-xs">
+                <pre className=" overflow-auto rounded bg-muted p-2 text-xs">
                   {JSON.stringify(result, null, 2)}
                 </pre>
               )}

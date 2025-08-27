@@ -2,6 +2,7 @@ import type { PdfParseResult, PdfParserResult } from "@/types";
 import * as pdfjsLib from "pdfjs-dist";
 import {
   convertToTransactionInterface,
+  convertToTransactionInterfaceML,
   cleanDescription,
   isSystemText,
 } from "./helpers";
@@ -10,7 +11,7 @@ import type { ParsedTransaction } from "./helpers";
 // Set up PDF.js worker - use local worker file
 pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 
-export function createIciciPdfParser(): PdfParserResult {
+export function createIciciPdfParser(useML: boolean = true): PdfParserResult {
   return {
     bank: "ICICI",
     async canParse(bytes: Uint8Array, fileName: string): Promise<boolean> {
@@ -90,11 +91,9 @@ export function createIciciPdfParser(): PdfParserResult {
           const pageTransactions = extractTransactionsFromPage(textContent);
 
           // Convert ParsedTransaction to Transaction format
-          const convertedTransactions = convertToTransactionInterface(
-            pageTransactions,
-            accountNumber,
-            "ICICI"
-          );
+          const convertedTransactions = useML 
+            ? await convertToTransactionInterfaceML(pageTransactions, accountNumber, "ICICI")
+            : convertToTransactionInterface(pageTransactions, accountNumber, "ICICI");
           transactions.push(...convertedTransactions);
         }
 

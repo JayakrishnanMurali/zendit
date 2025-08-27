@@ -58,3 +58,104 @@ export type PdfParserResult = {
     emitProgress: (progressPercent: number, message?: string) => void
   ) => Promise<PdfParseResult>;
 };
+
+// ML-related types
+export interface MLConfidence {
+  score: number; // 0-1, higher is more confident
+  source: "ml" | "rules" | "hybrid";
+}
+
+export interface MLCategoryPrediction {
+  category: string;
+  subcategory?: string;
+  confidence: MLConfidence;
+  alternativeCategories?: Array<{
+    category: string;
+    subcategory?: string;
+    confidence: number;
+  }>;
+}
+
+export interface MLMerchantPrediction {
+  merchant: string;
+  normalizedMerchant: string;
+  confidence: MLConfidence;
+  extractionMethod: "pattern" | "ml" | "fallback";
+}
+
+export interface MLTransactionEnrichment {
+  category: MLCategoryPrediction;
+  merchant: MLMerchantPrediction;
+  paymentMethod: string;
+  isRecurring: boolean;
+  tags: string[];
+  notes?: string;
+  confidence: MLConfidence;
+}
+
+export interface MLPreprocessedTransaction {
+  originalDescription: string;
+  cleanedDescription: string;
+  tokens: string[];
+  features: Record<string, number>;
+  amount: number;
+  type: "debit" | "credit";
+}
+
+export interface MLServiceConfig {
+  useML: boolean;
+  confidenceThreshold: number; // Minimum confidence to use ML results
+  fallbackToRules: boolean;
+  modelPath?: string;
+}
+
+// Base interface for ML services  
+export interface MLService {
+  readonly name: string;
+  readonly version: string;
+  isReady(): boolean;
+  getConfidence(): MLConfidence;
+}
+
+export interface MLCategoryClassifier extends MLService {
+  classify(
+    transaction: MLPreprocessedTransaction
+  ): Promise<{
+    category: string;
+    subcategory?: string;
+    confidence: number;
+    alternatives?: Array<{ category: string; subcategory?: string; confidence: number }>;
+  }>;
+}
+
+export interface MLMerchantExtractor extends MLService {
+  extractMerchant(
+    description: string,
+    amount?: number
+  ): Promise<{
+    merchant: string;
+    normalizedMerchant: string;
+    confidence: number;
+    extractionMethod: "pattern" | "ml" | "fallback";
+  }>;
+}
+
+export interface MLTextPreprocessor extends MLService {
+  preprocess(
+    description: string,
+    amount: number,
+    type: "debit" | "credit"
+  ): MLPreprocessedTransaction;
+  
+  extractFeatures(tokens: string[], amount: number): Record<string, number>;
+}
+
+// Category rule interface
+export interface CategoryRule {
+  keywords: string[];
+  merchantKeywords?: string[];
+  category: string;
+  subcategory?: string;
+  isRecurring?: boolean;
+  amountThreshold?: { min?: number; max?: number };
+}

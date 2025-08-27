@@ -10,13 +10,12 @@ export interface MerchantPattern {
   cleanup?: (name: string) => string;
 }
 
+// Conservative merchant patterns - no assumptive cleanup
 export const UPI_MERCHANT_PATTERNS: MerchantPattern[] = [
   {
-    // Primary UPI pattern with improved cleanup
+    // Basic UPI pattern - extract as-is
     regex: /UPI\/([^\/]+)(?:\/.*)?$/i,
     extractGroup: 1,
-    cleanup: (name) =>
-      name.replace(/\s*(REST|H|CO|PVT|LTD|SOLUTIONS?|SOL)$/i, "").trim(),
   },
   {
     regex: /IMPS\/([^\/]+)\/([^\/]+)/i,
@@ -31,68 +30,46 @@ export const UPI_MERCHANT_PATTERNS: MerchantPattern[] = [
     extractGroup: 2,
   },
   {
-    regex: /BIL\/(.+?)(?:\/.*)?$/i,
+    // Bill payments - extract as-is
+    regex: /BIL\/([^\/]+)(?:\/.*)?$/i,
     extractGroup: 1,
-    cleanup: (name) => name.replace(/\s*(CREDIT CA|EMI|LOAN).*$/i, "").trim(),
   },
 ];
 
-// Enhanced merchant normalizations with more entries
+// Strict merchant normalizations - only definitive, well-known brands
 export const MERCHANT_NORMALIZATIONS: Record<string, string> = {
+  // Food Delivery - Major platforms only
   SWIGGY: "Swiggy",
   SWIGGYINST: "Swiggy Instamart",
-  SWIGGYINSTAMAR: "Swiggy Instamart",
+  SWIGGYINSTAMAR: "Swiggy Instamart", 
   ZOMATO: "Zomato",
+  
+  // Streaming Services - Major platforms only
   NETFLIX: "Netflix",
   "NETFLIX CO": "Netflix",
+  
+  // E-commerce - Major platforms only
   AMAZON: "Amazon",
   FLIPKART: "Flipkart",
-  PAYTM: "Paytm",
-  PHONEPE: "PhonePe",
-  GPAY: "Google Pay",
-  "GOOGLE IND": "Google",
-  "GOOGLE INDIA": "Google",
-  UBER: "Uber",
-  OLA: "Ola",
   MYNTRA: "Myntra",
   AJIO: "Ajio",
-  "MY LOOKS": "My Looks",
-  "MY LOOKS H": "My Looks",
-  "LORDS REST": "Lords Restaurant",
-  LORDS: "Lords Restaurant",
-  "THE HAVEN": "The Haven Supermarket",
+  
+  // Payment Apps - Major platforms only
+  PAYTM: "Paytm",
+  PHONEPE: "PhonePe", 
+  GPAY: "Google Pay",
+  
+  // Tech Companies - Major platforms only
+  "GOOGLE IND": "Google",
+  "GOOGLE INDIA": "Google",
+  
+  // Transportation - Major platforms only
+  UBER: "Uber",
+  OLA: "Ola",
+  
+  // Entertainment - Major chains only
   "PVR INOX": "PVR Inox",
   "PVR INOX L": "PVR Inox",
-  "LULU INTER": "Lulu Hypermarket",
-  LULU: "Lulu Hypermarket",
-  "D CAFE AND": "D Cafe",
-  "ANBARASI A": "Anbarasi Restaurant",
-  "SKYNET SOL": "Skynet Solutions",
-  "BROADWAY A": "Broadway",
-  BROADWAY: "Broadway",
-  GOODCAREPE: "Good Care Pest Control",
-  MALABARCOM: "Malabar Restaurant",
-  PARKINGBOO: "Parking Booking",
-  ABHIRAMIPR: "Abhirami",
-  "ABHIRAMI V": "Abhirami",
-  "LAKSHMY FU": "Lakshmy",
-  "J S FRUITS": "J S Fruits",
-  "AKB FRUITS": "AKB Fruits",
-  "BAAWRCHI T": "Baawrchi",
-  "MEJO JACOB": "Mejo Jacob",
-  "PRAVEEN KU": "Praveen Kumar",
-  "MINIMOL R": "Minimol",
-  "NANDANA M": "Nandana",
-  "MURALI R": "Murali",
-  JAYAKRISHN: "Jayakrishnan",
-  "SHAMLA J": "Shamla",
-  "GVR AND CO": "GVR & Co",
-  "RAMESAN C": "Ramesan",
-  "MOHAMMAD A": "Mohammad",
-  "BHARAT KUM": "Bharat Kumar",
-  "AMBIKA NIT": "Ambika",
-  SHABABAIK: "Shabab",
-  "PARAGON LU": "Paragon",
 };
 
 export function extractMerchant(
@@ -101,52 +78,25 @@ export function extractMerchant(
 ): string {
   const cleanDesc = description.trim();
 
-  // Try each pattern
+  // Try each pattern - extract as-is without assumptions
   for (const pattern of patterns) {
     const match = cleanDesc.match(pattern.regex);
     if (match && match[pattern.extractGroup]) {
       let merchant = match[pattern.extractGroup]?.trim();
 
-      // Apply pattern-specific cleanup
-      if (pattern.cleanup && merchant) {
-        merchant = pattern.cleanup(merchant);
-      }
-
-      // Apply general cleanup
-      merchant = cleanMerchantName(merchant ?? "");
-
-      if (merchant && merchant.length > 1) {
-        return normalizeMerchantName(merchant);
+      if (merchant && merchant.length > 2) {
+        // Only normalize if we have an exact match in our strict list
+        const normalized = normalizeMerchantName(merchant, MERCHANT_NORMALIZATIONS);
+        return normalized;
       }
     }
   }
 
-  // Fallback: extract meaningful words
-  return extractFallbackMerchant(cleanDesc);
+  // No fallback - return Unknown if no definitive match
+  return "Unknown";
 }
 
-export function cleanMerchantName(name: string): string {
-  return (
-    name
-      // Remove common business suffixes (improved regex)
-      .replace(
-        /\s*(REST|RESTAURANT|PVT\s*LTD|LTD|PVT|PRIVATE|LIMITED|COMPANY|CO|INC|CORP|LLC|SOL|SOLUTIONS?|H)\s*$/i,
-        ""
-      )
-      // Remove single trailing letters (like 'H' in 'MY LOOKS H')
-      .replace(/\s+[A-Z]$/, "")
-      // Remove common prefixes
-      .replace(/^(MR|MS|DR|PROF)\s+/i, "")
-      // Remove transaction codes and IDs
-      .replace(/\b[A-Z]{3}\d{6,}\b/g, "")
-      .replace(/\b\d{6,}\b/g, "")
-      // Remove special characters but keep spaces and hyphens
-      .replace(/[^A-Za-z0-9\s\-&]/g, " ")
-      // Clean up multiple spaces
-      .replace(/\s+/g, " ")
-      .trim()
-  );
-}
+// Removed assumptive merchant name cleanup
 
 export function normalizeMerchantName(
   name: string,
@@ -154,60 +104,16 @@ export function normalizeMerchantName(
 ): string {
   const upperName = name.toUpperCase();
 
-  // Check for exact matches first
+  // Only return normalized name for exact matches
   if (normalizations[upperName]) {
     return normalizations[upperName];
   }
 
-  // Check for partial matches (more specific first)
-  const sortedKeys = Object.keys(normalizations).sort(
-    (a, b) => b.length - a.length
-  );
-  for (const key of sortedKeys) {
-    if (upperName.includes(key)) {
-      return normalizations[key] ?? name;
-    }
-  }
-
-  // Return title case version
-  return name
-    .toLowerCase()
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  // No partial matching - return original name if not exactly known
+  return name.trim();
 }
 
-export function extractFallbackMerchant(description: string): string {
-  const stopWords = new Set([
-    "UPI",
-    "BANK",
-    "ICI",
-    "ICICI",
-    "HDFC",
-    "AXIS",
-    "YES",
-    "SBI",
-    "STATE",
-    "TO",
-    "FROM",
-    "TRANSFER",
-    "PAYMENT",
-    "MONTHLY",
-    "AU",
-    "GENERATING",
-  ]);
-
-  const words = description
-    .split(/[\s\/\-\_\|]+/)
-    .filter((word) => {
-      const clean = word.replace(/[^A-Za-z]/g, "").toUpperCase();
-      return clean.length >= 3 && !stopWords.has(clean) && !/^\d+$/.test(clean);
-    })
-    .slice(0, 2); // Take first 2 meaningful words
-
-  const result = words.join(" ").trim();
-  return result || "Unknown";
-}
+// Removed assumptive fallback merchant extraction
 
 // ============================================================================
 // ENHANCED CATEGORIZATION HELPERS
@@ -222,168 +128,74 @@ export interface CategoryRule {
   amountThreshold?: { min?: number; max?: number };
 }
 
+// Ultra-strict category rules - only definitive merchant matches
 export const DEFAULT_CATEGORY_RULES: CategoryRule[] = [
-  // Entertainment - Movies (HIGH PRIORITY FIX)
+  // Food Delivery - Only major platforms with exact merchant matches
   {
-    keywords: ["pvr", "inox", "cinema", "movie", "theatre", "theater"],
-    merchantKeywords: ["pvr inox", "pvr", "inox"],
-    category: "Entertainment",
-    subcategory: "Movies",
+    keywords: [],
+    merchantKeywords: ["swiggy", "swiggy instamart", "zomato"],
+    category: "Food & Dining",
+    subcategory: "Food Delivery", 
     isRecurring: false,
   },
-  // Entertainment - Streaming
+  
+  // Entertainment - Streaming - Only exact matches
   {
-    keywords: [
-      "netflix",
-      "prime",
-      "spotify",
-      "youtube",
-      "hotstar",
-      "zee5",
-      "voot",
-    ],
+    keywords: [],
     merchantKeywords: ["netflix"],
     category: "Entertainment",
     subcategory: "Streaming Services",
     isRecurring: true,
   },
-  // Food & Dining - Delivery
+  
+  // Entertainment - Movies - Only exact chain matches
   {
-    keywords: ["swiggy", "zomato", "uber eats", "food delivery", "instamart"],
-    merchantKeywords: ["swiggy", "swiggy instamart", "zomato"],
-    category: "Food & Dining",
-    subcategory: "Food Delivery",
+    keywords: [],
+    merchantKeywords: ["pvr inox"],
+    category: "Entertainment",
+    subcategory: "Movies",
     isRecurring: false,
   },
-  // Food & Dining - Restaurant (HIGH PRIORITY FIX)
+  
+  // E-commerce - Only major platforms with exact matches
   {
-    keywords: [
-      "restaurant",
-      "cafe",
-      "dining",
-      "hotel",
-      "bar",
-      "rest",
-      "anbarasi",
-      "lords",
-      "malabar",
-      "baawrchi",
-    ],
-    merchantKeywords: [
-      "lords restaurant",
-      "anbarasi restaurant",
-      "d cafe",
-      "malabar restaurant",
-      "baawrchi",
-    ],
-    category: "Food & Dining",
-    subcategory: "Restaurant",
-    isRecurring: false,
-  },
-  // Shopping - Groceries
-  {
-    keywords: ["supermarket", "grocery", "haven", "lulu", "hypermarket"],
-    merchantKeywords: ["the haven supermarket", "lulu hypermarket"],
-    category: "Shopping",
-    subcategory: "Groceries",
-    isRecurring: false,
-  },
-  // Shopping - Online
-  {
-    keywords: [
-      "amazon",
-      "flipkart",
-      "myntra",
-      "ajio",
-      "shopping",
-      "mall",
-      "store",
-      "looks",
-    ],
-    merchantKeywords: ["my looks"],
+    keywords: [],
+    merchantKeywords: ["amazon", "flipkart", "myntra", "ajio"],
     category: "Shopping",
     subcategory: "Online Shopping",
     isRecurring: false,
   },
-  // Transportation
+  
+  // Transportation - Only major platforms with exact matches
   {
-    keywords: [
-      "uber",
-      "ola",
-      "rapido",
-      "taxi",
-      "auto",
-      "metro",
-      "bus",
-      "train",
-      "ixigo",
-    ],
-    merchantKeywords: ["ixigo"],
+    keywords: [],
+    merchantKeywords: ["uber", "ola"],
     category: "Transportation",
-    subcategory: "Travel Booking",
     isRecurring: false,
   },
-  // Home & Services (NEW CATEGORY)
+  
+  // Payment platforms - Only exact matches 
   {
-    keywords: ["pest control", "goodcare", "skynet"],
-    merchantKeywords: ["good care pest control", "skynet solutions"],
-    category: "Home & Services",
-    subcategory: "Pest Control",
+    keywords: [],
+    merchantKeywords: ["paytm", "phonepe", "google pay"],
+    category: "Transfer",
+    subcategory: "Digital Wallet",
     isRecurring: false,
   },
-  // Utilities
+  
+  // ATM - Only when explicitly mentioned
   {
-    keywords: [
-      "electricity",
-      "water",
-      "gas",
-      "internet",
-      "mobile",
-      "phone",
-      "broadband",
-    ],
-    category: "Utilities",
-    subcategory: "Bills",
-    isRecurring: true,
-  },
-  // Healthcare
-  {
-    keywords: ["medical", "hospital", "pharmacy", "doctor", "clinic", "health"],
-    category: "Healthcare",
-    isRecurring: false,
-  },
-  // Transportation - Fuel
-  {
-    keywords: [
-      "petrol",
-      "diesel",
-      "fuel",
-      "hp",
-      "bharat petroleum",
-      "indian oil",
-    ],
-    category: "Transportation",
-    subcategory: "Fuel",
-    isRecurring: false,
-  },
-  // Transportation - Parking
-  {
-    keywords: ["parking", "parkingboo"],
-    merchantKeywords: ["parking booking"],
-    category: "Transportation",
-    subcategory: "Parking",
-    isRecurring: false,
-  },
-  // Cash & ATM
-  {
-    keywords: ["atm", "cash", "withdrawal"],
+    keywords: ["atm withdrawal", "cash withdrawal"],
+    merchantKeywords: [],
     category: "Cash & ATM",
     isRecurring: false,
   },
-  // Finance - Loans
+  
+  // EMI/Loans - Only when explicitly mentioned
   {
-    keywords: ["loan", "emi", "credit card", "personal loan"],
-    category: "Finance",
+    keywords: ["emi", "loan emi", "personal loan"],
+    merchantKeywords: [],
+    category: "Finance", 
     subcategory: "Loans & EMI",
     isRecurring: true,
   },
@@ -402,28 +214,28 @@ export function categorizeTransaction(
 } {
   const desc = description.toLowerCase();
   const merch = merchant.toLowerCase();
-  const combinedText = `${desc} ${merch}`;
 
-  // Check each rule with better matching
+  // Ultra-strict rule matching - only exact merchant matches
   for (const rule of rules) {
-    const matchesKeywords = rule.keywords.some((keyword) =>
-      combinedText.includes(keyword.toLowerCase())
-    );
-
+    // Only check merchantKeywords for exact matches (no description keyword matching)
     const matchesMerchantKeywords = rule.merchantKeywords
-      ? rule.merchantKeywords.some(
-          (keyword) =>
-            merch.includes(keyword.toLowerCase()) ||
-            desc.includes(keyword.toLowerCase())
+      ? rule.merchantKeywords.some((keyword) =>
+          merch === keyword.toLowerCase() || merch.includes(keyword.toLowerCase())
         )
       : false;
+
+    // Check description keywords only for very specific terms
+    const matchesKeywords = rule.keywords.some((keyword) =>
+      desc.includes(keyword.toLowerCase())
+    );
 
     const matchesAmount =
       !rule.amountThreshold ||
       ((!rule.amountThreshold.min || amount >= rule.amountThreshold.min) &&
         (!rule.amountThreshold.max || amount <= rule.amountThreshold.max));
 
-    if ((matchesKeywords || matchesMerchantKeywords) && matchesAmount) {
+    // Require merchant match OR very specific keyword match
+    if ((matchesMerchantKeywords || matchesKeywords) && matchesAmount) {
       return {
         category: rule.category,
         subcategory: rule.subcategory,
@@ -433,15 +245,7 @@ export function categorizeTransaction(
     }
   }
 
-  // Personal transfer detection (improved)
-  if (isPersonalTransfer(description, merchant)) {
-    return {
-      category: "Transfer",
-      subcategory: "Personal",
-      paymentMethod: determinePaymentMethod(description),
-      isRecurring: false,
-    };
-  }
+  // No personal transfer detection - too assumptive
 
   // Default category
   return {
@@ -468,54 +272,7 @@ export function determinePaymentMethod(description: string): string {
   return "UPI"; // Default for most transactions
 }
 
-export function isPersonalTransfer(
-  description: string,
-  merchant: string
-): boolean {
-  const desc = description.toLowerCase();
-  const merch = merchant.toLowerCase();
-
-  // Check for payment apps (enhanced)
-  if (
-    desc.includes("paytm-") ||
-    desc.includes("gpay-") ||
-    desc.includes("phonepe")
-  ) {
-    return true;
-  }
-
-  // Check if merchant looks like a person name
-  const businessKeywords = [
-    "pvt",
-    "ltd",
-    "co",
-    "inc",
-    "corp",
-    "bank",
-    "services",
-    "solutions",
-    "restaurant",
-    "supermarket",
-    "store",
-    "cafe",
-    "mall",
-    "shop",
-  ];
-
-  const hasBusinessKeyword = businessKeywords.some((keyword) =>
-    merch.includes(keyword)
-  );
-
-  // Personal names are usually short, don't contain business keywords, and may have initials
-  const isPersonName =
-    !hasBusinessKeyword &&
-    merch.length < 25 &&
-    !merch.includes("@") &&
-    !merch.includes("www") &&
-    !/\d{4,}/.test(merch); // No long numbers
-
-  return isPersonName;
-}
+// Removed assumptive personal transfer detection
 
 // ============================================================================
 // ENHANCED UTILITY HELPERS
@@ -620,63 +377,39 @@ export function isSystemText(text: string): boolean {
 
 export function generateTags(
   description: string,
-  merchant: string,
+  _merchant: string,
   category: string,
   amount?: number
 ): string[] {
   const tags = new Set<string>();
   const desc = description.toLowerCase();
-  const merch = merchant.toLowerCase();
 
-  // Add category as base tag
+  // Add category as base tag (factual)
   tags.add(category.toLowerCase().replace(/[\s&]/g, "-"));
 
-  // Payment method tags (enhanced)
-  if (desc.includes("bhqr")) tags.add("qr-payment");
+  // Payment method tags - only from transaction description (factual)
   if (desc.includes("upi")) tags.add("upi");
-  if (desc.includes("gpay")) tags.add("google-pay");
-  if (desc.includes("paytm")) tags.add("paytm");
-  if (desc.includes("neft")) tags.add("neft");
+  if (desc.includes("neft")) tags.add("neft"); 
   if (desc.includes("imps")) tags.add("imps");
   if (desc.includes("rtgs")) tags.add("rtgs");
+  if (desc.includes("atm")) tags.add("atm");
 
-  // Bank tags
+  // Bank tags - only when explicitly mentioned (factual)
   if (desc.includes("hdfc")) tags.add("hdfc-bank");
   if (desc.includes("icici")) tags.add("icici-bank");
   if (desc.includes("axis")) tags.add("axis-bank");
-  if (desc.includes("sbi") || desc.includes("state bank")) tags.add("sbi-bank");
-  if (desc.includes("yes bank")) tags.add("yes-bank");
+  if (desc.includes("sbi")) tags.add("sbi-bank");
 
-  // Service-specific tags
-  if (/swiggy/i.test(merch)) {
-    tags.add("food-delivery");
-    if (/instamart/i.test(merch)) tags.add("grocery-delivery");
-  }
-  if (/netflix|prime|spotify/i.test(merch)) {
-    tags.add("subscription");
-    tags.add("monthly-bill");
-  }
-  if (/emi|loan/i.test(desc)) {
-    tags.add("recurring");
-    tags.add("loan-payment");
-  }
+  // Transaction type tags - only when explicitly mentioned (factual)
+  if (desc.includes("withdrawal")) tags.add("withdrawal");
+  if (desc.includes("transfer")) tags.add("transfer");
+  if (desc.includes("payment")) tags.add("payment");
 
-  // Amount-based tags
+  // Amount-based tags (factual)
   if (amount) {
-    if (amount > 10000) tags.add("high-amount");
+    if (amount >= 10000) tags.add("high-amount");
     if (amount < 100) tags.add("small-amount");
-  }
-
-  // Add merchant name as tag if meaningful
-  if (merchant !== "Unknown" && merchant.length > 2) {
-    const merchantTag = merchant
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "-")
-      .replace(/-+/g, "-")
-      .replace(/^-|-$/g, "");
-    if (merchantTag.length > 1) {
-      tags.add(`merchant-${merchantTag}`);
-    }
+    if (amount % 100 === 0 && amount >= 1000) tags.add("round-amount");
   }
 
   return Array.from(tags).filter((tag) => tag.length > 0);
@@ -735,4 +468,95 @@ export function convertToTransactionInterface(
       updatedAt: now,
     };
   });
+}
+
+/**
+ * ML-enhanced version of convertToTransactionInterface
+ * Uses ML pipeline for better categorization and merchant extraction
+ */
+export async function convertToTransactionInterfaceML(
+  parsedTransactions: ParsedTransaction[],
+  accountNumber: string,
+  bankName: string = "ICICI"
+): Promise<Transaction[]> {
+  // Lazy import ML pipeline to avoid loading it unless needed
+  const { createMLPipeline } = await import('../ml/pipeline');
+  const mlPipeline = createMLPipeline({
+    useML: true,
+    confidenceThreshold: 0.7,
+    fallbackToRules: true,
+  });
+
+  const results = await Promise.all(
+    parsedTransactions.map(async (tx, index) => {
+      const now = new Date();
+      const dateKey = tx.date.replace(/[-\/]/g, "");
+      const id = `${bankName.toLowerCase()}_${accountNumber}_${dateKey}_${index}`;
+      const type = (tx.type === "DR" ? "debit" : "credit") as "debit" | "credit";
+
+      try {
+        // Use ML pipeline for enrichment
+        const mlEnrichment = await mlPipeline.enrichTransaction(
+          tx.description,
+          tx.amount,
+          type
+        );
+
+        return {
+          id,
+          date: parseDate(tx.date),
+          amount: tx.amount,
+          description: tx.description,
+          type,
+          category: mlEnrichment.category.category,
+          subcategory: mlEnrichment.category.subcategory,
+          merchant: mlEnrichment.merchant.normalizedMerchant,
+          account: accountNumber,
+          paymentMethod: mlEnrichment.paymentMethod,
+          isRecurring: mlEnrichment.isRecurring,
+          tags: mlEnrichment.tags,
+          notes: mlEnrichment.notes,
+          isVerified: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+      } catch (error) {
+        console.warn(`ML processing failed for transaction ${index}, falling back to rules:`, error);
+        
+        // Fallback to original rule-based processing
+        const merchant = extractMerchant(tx.description);
+        const categorization = categorizeTransaction(
+          tx.description,
+          merchant,
+          tx.amount
+        );
+
+        return {
+          id,
+          date: parseDate(tx.date),
+          amount: tx.amount,
+          description: tx.description,
+          type,
+          category: categorization.category,
+          subcategory: categorization.subcategory,
+          merchant,
+          account: accountNumber,
+          paymentMethod: categorization.paymentMethod,
+          isRecurring: categorization.isRecurring,
+          tags: [...generateTags(
+            tx.description,
+            merchant,
+            categorization.category,
+            tx.amount
+          ), 'fallback-processing'],
+          notes: extractNotes(tx.description),
+          isVerified: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+      }
+    })
+  );
+
+  return results;
 }
